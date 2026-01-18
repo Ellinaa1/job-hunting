@@ -4,3 +4,4 @@ node_modules/
 logs/
 *.log
 .vscode/
+test-endpoints.js

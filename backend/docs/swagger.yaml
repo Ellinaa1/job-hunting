@@ -1,0 +1,764 @@
+openapi: 3.0.3
+info:
+  title: Job Hunting API
+  version: 1.0.0
+  description: API documentation for Job Hunting app
+
+servers:
+  - url: http://localhost:4002
+    description: Local server
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Role:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+      required:
+        - id
+        - name
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        surname:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        roleId:
+          type: integer
+        isVerified:
+          type: boolean
+        verificationToken:
+          type: string
+        resetToken:
+          type: string
+        resetTokenExpiry:
+          type: string
+          format: date-time
+        attempts:
+          type: integer
+        isBlocked:
+          type: boolean
+        blockedTime:
+          type: integer
+      required:
+        - id
+        - name
+        - surname
+        - email
+        - password
+        - roleId
+
+    Candidate:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        cvUrl:
+          type: string
+        phone:
+          type: string
+        city:
+          type: string
+        profession:
+          type: string
+        linkedin:
+          type: string
+      required:
+        - id
+        - userId
+
+    Employer:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        companyId:
+          type: integer
+        position:
+          type: string
+        phone:
+          type: string
+        industry:
+          type: string
+      required:
+        - id
+        - userId
+
+    Company:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        industry:
+          type: string
+        location:
+          type: string
+        website:
+          type: string
+        logoUrl:
+          type: string
+      required:
+        - id
+        - name
+        - industry
+
+    Job:
+      type: object
+      properties:
+        id:
+          type: integer
+        employerId:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        location:
+          type: string
+        salaryMin:
+          type: integer
+        salaryMax:
+          type: integer
+        status:
+          type: string
+        category:
+          type: string
+        city:
+          type: string
+        type:
+          type: string
+        level:
+          type: string
+      required:
+        - id
+        - employerId
+        - title
+        - description
+        - status
+
+    Application:
+      type: object
+      properties:
+        id:
+          type: integer
+        jobId:
+          type: integer
+        candidateId:
+          type: integer
+        status:
+          type: string
+        coverLetter:
+          type: string
+        cvUrl:
+          type: string
+      required:
+        - id
+        - jobId
+        - candidateId
+        - status
+
+security:
+  - BearerAuth: []
+
+# ------------------------
+# AUTH ROUTES
+# ------------------------
+paths:
+  /auth/candidate/signup:
+    post:
+      summary: Candidate signup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - surname
+                - email
+                - password
+              properties:
+                name:
+                  type: string
+                surname:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '201':
+          description: Candidate created
+        '400':
+          description: Validation error
+
+  /auth/employer/signup:
+    post:
+      summary: Employer signup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - surname
+                - email
+                - password
+              properties:
+                name:
+                  type: string
+                surname:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '201':
+          description: Employer created
+        '400':
+          description: Validation error
+
+  /auth/login:
+    post:
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Logged in successfully
+        '400':
+          description: Invalid credentials
+
+  /auth/verify-email/{token}:
+    get:
+      summary: Verify email
+      parameters:
+        - in: path
+          name: token
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Email verified
+        '400':
+          description: Invalid token
+
+  /auth/forgot-password:
+    post:
+      summary: Forgot password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+      responses:
+        '200':
+          description: Reset email sent
+
+  /auth/reset-password/{token}:
+    post:
+      summary: Reset password
+      parameters:
+        - in: path
+          name: token
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - newPassword
+              properties:
+                newPassword:
+                  type: string
+      responses:
+        '200':
+          description: Password reset successfully
+
+# ------------------------
+# USER ROUTES
+# ------------------------
+  /user/profile:
+    get:
+      summary: Get current user profile
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+    put:
+      summary: Update profile
+      security:
+        - BearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        '200':
+          description: Profile updated
+
+  /user/change-password:
+    put:
+      summary: Change password
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - oldPassword
+                - newPassword
+              properties:
+                oldPassword:
+                  type: string
+                newPassword:
+                  type: string
+      responses:
+        '200':
+          description: Password changed
+
+  /user/account:
+    delete:
+      summary: Delete account
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Account deleted
+
+  /user/applications/list:
+    get:
+      summary: Get my applications
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of applications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Application'
+
+  /user/{id}:
+    get:
+      summary: Get user by ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /jobs:
+    get:
+      summary: Get all jobs
+      responses:
+        '200':
+          description: List of jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Job'
+    post:
+      summary: Create a job
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - description
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                location:
+                  type: string
+                salaryMin:
+                  type: integer
+                salaryMax:
+                  type: integer
+                category:
+                  type: string
+                city:
+                  type: string
+                type:
+                  type: string
+                level:
+                  type: string
+      responses:
+        '201':
+          description: Job created
+
+  /jobs/{id}:
+    get:
+      summary: Get job by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Job data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+    put:
+      summary: Update job
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Job'
+      responses:
+        '200':
+          description: Job updated
+    delete:
+      summary: Delete job
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Job deleted
+
+  /jobs/{id}/apply:
+    post:
+      summary: Apply for a job
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                coverLetter:
+                  type: string
+                cvUrl:
+                  type: string
+      responses:
+        '201':
+          description: Application submitted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
+
+  /jobs/employer/me:
+    get:
+      summary: Get my jobs (employer)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of employer's jobs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Job'
+
+  /jobs/company/{id}:
+    get:
+      summary: Get jobs by company ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Jobs for a company
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Job'
+
+  /jobs/{id}/close:
+    patch:
+      summary: Close a job (employer)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Job closed
+
+  /jobs/{id}/open:
+    patch:
+      summary: Open a job (employer)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Job opened
+
+# ------------------------
+# COMPANY ROUTES
+# ------------------------
+  /companies:
+    get:
+      summary: Get all companies
+      responses:
+        '200':
+          description: List of companies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Company'
+    post:
+      summary: Create a company
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Company'
+      responses:
+        '201':
+          description: Company created
+
+  /companies/{companyId}:
+    get:
+      summary: Get company by ID
+      parameters:
+        - in: path
+          name: companyId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Company data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Company'
+    put:
+      summary: Update company
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: companyId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Company'
+      responses:
+        '200':
+          description: Company updated
+    delete:
+      summary: Delete company
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: companyId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Company deleted
+
+# ------------------------
+# APPLICATION ROUTES
+# ------------------------
+  /applications/candidate/list:
+    get:
+      summary: Get candidate's applications
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of applications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Application'
+
+  /applications/{applicationId}:
+    get:
+      summary: Get application by ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: applicationId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Application data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Application'
+    delete:
+      summary: Withdraw application
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: applicationId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Application withdrawn
+
+  /applications/{applicationId}/status:
+    patch:
+      summary: Update application status (employer)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: applicationId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [pending, accepted, rejected]
+      responses:
+        '200':
+          description: Status updated
+
+

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import authController from "../controllers/authController.js";
 import validateRequiredStrings from "../middlewares/validateRequiredFields.js";
-import { auth } from "../middlewares/auth.js";
+
 
 const router = Router();
 
@@ -25,8 +25,18 @@ router.post(
   authController.login
 ); // for all 3 roles
 
-router.post("/logout", authController.logout); // not done
-router.post("/refresh", authController.refreshToken); // not done
+router.post(
+  "/forgot-password",
+  validateRequiredStrings(["email"]),
+  authController.forgotPassword
+);
 
+router.post(
+  "/reset-password/:token",
+  validateRequiredStrings(["newPassword"]),
+  authController.resetPassword
+);
+
+router.get("/reset-password/:token", authController.renderResetPasswordPage);
 
 export default router;

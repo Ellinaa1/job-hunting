@@ -3,6 +3,7 @@ import { User, Employer, Candidate } from "../models/index.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { sendVerificationEmail } from "../utils/sendVerificationEmail.js";
+import { sendPasswordResetEmail } from "../utils/sendPasswordResetEmail.js";
 
 class AuthController {
   async candidateSignup(req, res) {
@@ -17,6 +18,12 @@ class AuthController {
       city,
       cvUrl,
     } = req.body;
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: "Invalid email format" });
+    }
 
     const t = await sequelize.transaction();
 
@@ -36,10 +43,10 @@ class AuthController {
           surname,
           email,
           password: hashedPassword,
-          roleId: 3,
+          roleId: 3, // candidate
           isVerified: false,
         },
-        { transaction: t }
+        { transaction: t },
       );
 
       const newCandidate = await Candidate.create(
@@ -51,16 +58,16 @@ class AuthController {
           city,
           cvUrl,
         },
-        { transaction: t }
+        { transaction: t },
       );
 
-      // 🌟 SEND EMAIL + GET TOKEN HERE
+      // send email get token
       const verificationToken = await sendVerificationEmail(
         newUser.name,
-        newUser.email
+        newUser.email,
       );
 
-      // 🌟 SAVE TOKEN
+      // save token
       newUser.verificationToken = verificationToken;
       await newUser.save({ transaction: t });
 
@@ -82,10 +89,15 @@ class AuthController {
       res.status(500).json({ error: err.message });
     }
   }
-
   async employerSignup(req, res) {
     const { name, surname, email, password, position, phone, industry } =
       req.body;
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: "Invalid email format" });
+    }
 
     const t = await sequelize.transaction();
 
@@ -108,7 +120,7 @@ class AuthController {
           roleId: 2,
           isVerified: false,
         },
-        { transaction: t }
+        { transaction: t },
       );
 
       const newEmployer = await Employer.create(
@@ -118,16 +130,16 @@ class AuthController {
           phone,
           industry,
         },
-        { transaction: t }
+        { transaction: t },
       );
 
-      // 🌟 SEND EMAIL + GET TOKEN
+      // send email, get token
       const verificationToken = await sendVerificationEmail(
         newUser.name,
-        newUser.email
+        newUser.email,
       );
 
-      // 🌟 SAVE TOKEN
+      // save token
       newUser.verificationToken = verificationToken;
       await newUser.save({ transaction: t });
 
@@ -149,7 +161,6 @@ class AuthController {
       res.status(500).json({ error: err.message });
     }
   }
-
   async verifyEmail(req, res) {
     const { token } = req.params;
     const user = await User.findOne({ where: { verificationToken: token } });
@@ -163,7 +174,6 @@ class AuthController {
 
     res.json({ message: "Email verified successfully" });
   }
-
   async login(req, res) {
     const { email, password } = req.body;
     try {
@@ -213,7 +223,7 @@ class AuthController {
           isVerified: user.isVerified,
         },
         process.env.JWT_SECRET,
-        { expiresIn: "100d" } //
+        { expiresIn: "100d" },
       );
 
       return res.json({
@@ -232,20 +242,110 @@ class AuthController {
       return res.status(500).json({ error: err.message });
     }
   }
-
-  async logout(req, res) {
-    // not done
+  async renderResetPasswordPage(req, res) {
     try {
-      // On the backend side there is nothing to delete.
-      // Logout simply tells the client to remove the JWT.
+      const { token } = req.params;
 
-      return res.json({ message: "Logout successful" });
+      const user = await User.findOne({
+        where: { resetToken: token },
+      });
+
+      if (!user || new Date() > user.resetTokenExpiry) {
+        return res.status(400).send("Reset link is invalid or expired");
+      }
+
+      res.send(`
+        <html>
+          <body>
+            <h2>Reset password</h2>
+            <form method="POST" action="/auth/reset-password/${token}">
+              <input 
+                type="password" 
+                name="newPassword" 
+                placeholder="New password" 
+                required 
+              />
+              <br/><br/>
+              <button type="submit">Reset</button>
+            </form>
+          </body>
+        </html>
+      `);
     } catch (err) {
-      console.error("Logout error:", err);
+      console.error(err);
+      res.status(500).send("Server error");
+    }
+  }
+  async forgotPassword(req, res) {
+    try {
+      const { email } = req.body;
+
+      if (!email) {
+        return res.status(400).json({ error: "Email is required" });
+      }
+
+      const user = await User.findOne({ where: { email } });
+      if (!user) {
+        // Don't reveal if email exists or not (security)
+        return res.json({
+          message: "If an account exists, a password reset link has been sent",
+        });
+      }
+
+      // Generate reset token (valid for 1 hour)
+      const resetToken = await sendPasswordResetEmail(user.name, user.email);
+
+      // Save token and expiry to user
+      user.resetToken = resetToken;
+      user.resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+      await user.save();
+
+      return res.json({
+        message: "If an account exists, a password reset link has been sent",
+      });
+    } catch (err) {
+      console.error(err);
       return res.status(500).json({ error: "Server error" });
     }
   }
-  async refreshToken(req, res) {} // not done
+  async resetPassword(req, res) {
+    try {
+      const { token } = req.params;
+      const { newPassword } = req.body;
+
+      if (!newPassword) {
+        return res.status(400).json({ error: "New password is required" });
+      }
+
+      const user = await User.findOne({
+        where: { resetToken: token },
+      });
+
+      if (!user) {
+        return res.status(400).json({ error: "Invalid or expired reset link" });
+      }
+
+      // Check if token is expired
+      if (new Date() > user.resetTokenExpiry) {
+        user.resetToken = null;
+        user.resetTokenExpiry = null;
+        await user.save();
+        return res.status(400).json({ error: "Reset link has expired" });
+      }
+
+      // Hash and update password
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      user.password = hashedPassword;
+      user.resetToken = null;
+      user.resetTokenExpiry = null;
+      await user.save();
+
+      return res.json({ message: "Password reset successfully" });
+    } catch (err) {
+      console.error(err);
+      return res.status(500).json({ error: "Server error" });
+    }
+  }
 }
 
 export default new AuthController();

@@ -8,7 +8,6 @@ export const Role = sequelize.define(
       type: DataTypes.INTEGER,
       primaryKey: true,
       allowNull: false
-      // no autoIncrement because IDs are fixed manually
     },
     name: {
       type: DataTypes.STRING,

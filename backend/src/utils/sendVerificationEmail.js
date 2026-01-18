@@ -6,7 +6,7 @@ export async function sendVerificationEmail(name, email) {
   const token = crypto.randomBytes(32).toString("hex");
   const verifyUrl = `${process.env.CLIENT_URL}/auth/verify-email/${token}`;
 
-  // 3. Create transporter
+  // Create transporter
   const transporter = nodemailer.createTransport({
     service: "gmail",
     auth: {
@@ -15,7 +15,7 @@ export async function sendVerificationEmail(name, email) {
     },
   });
 
-  // 4. Send mail
+  // Send mail
   await transporter.sendMail({
     from: process.env.SMTP_USER,
     to: email,

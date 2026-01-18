@@ -54,6 +54,16 @@ export const User = sequelize.define(
       allowNull: true,
     },
 
+    resetToken: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
+    resetTokenExpiry: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+
     attempts: {
       type: DataTypes.INTEGER,
       allowNull: false,
